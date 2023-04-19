@@ -32,6 +32,6 @@ n_splits: 2                    # numbaer of split in K-forld
 
 dataset:
   #num_workers: 18                # dataloader number of workers
-  valid_size: 0.1               # ratio of validation data
+  valid_size: 0.0              # ratio of validation data
   test_size: 0.1                # ratio of test data
   #splitting: random          # data splitting (i.e., random/scaffold)
