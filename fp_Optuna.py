@@ -14,11 +14,12 @@ import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
-from sklearn.metrics import roc_auc_score, accuracy_score, mean_squared_error, mean_absolute_error,r2_score
+from sklearn.metrics import roc_auc_score, accuracy_score, mean_squared_error, mean_absolute_error, r2_score, mean_squared_log_error
 from sklearn.linear_model import LogisticRegression, Lasso
 from sklearn.preprocessing import label_binarize
 from sklearn.model_selection import KFold
 
+import xgboost as xgb
 import optuna
 
 class Objective:
@@ -50,18 +51,32 @@ class Objective:
                 calc_dir += '+calc'
         elif self.config['calc']:
             if self.config['task_name'] == 'PC' or self.config['task_name'] == 'PC_rgr':
-                calc_dir = '{}_{}_{}_only-calc_{}'.format(self.config['task_name'], 
-                                                          self.config['model_type'],rxn_names, start_time)
+                calc_dir = '{}_{}_{}_{}_only-calc_{}'.format(self.config['task_name'], 
+                                                             self.config['model_type'], 
+                                                             self.config['evaluation_function'],
+                                                             rxn_names, start_time)
             else:
-                calc_dir = '{}_{}_only-calc_{}'.format(self.config['task_name'], self.config['model_type'], start_time)
-        os.makedirs(calc_dir, exist_ok=True)
+                calc_dir = '{}_{}_{}_only-calc_{}'.format(self.config['task_name'],
+                                                          self.config['model_type'], 
+                                                          self.config['evaluation_function'], start_time)
         this_dir = os.path.join('Optuna_data', calc_dir)
+        os.makedirs(this_dir, exist_ok=True)
         #trial number
         trial_number = trial.number
 
         #param
         if self.config['model_type'] == 'Lasso':
-            params = {'alpha' : trial.suggest_uniform('alpha', 0.1, 1.0)}
+            params = {'alpha' : trial.suggest_uniform('alpha', 0.0, 1.0)}
+        elif self.config['model_type'] == 'XGB':
+            params = {'max_depth' : trial.suggest_int('max_depth', 3, 8, step=1), 
+                      'min_child_weight': trial.suggest_int('min_child_weight', 1, 5, step=1), 
+                      'gamma': trial.suggest_float('gamma', 0.0, 0.6, step=0.1), 
+                      'subsample': trial.suggest_float('subsample', 0.6, 1.0, step=0.1), 
+                      'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0, step=0.1),
+                      'reg_alpha': trial.suggest_loguniform('reg_alpha', 1e-5, 100), 
+                      'n_estimators': trial.suggest_loguniform('n_estimators', 10, 1000), 
+                      'reg_lambda': trial.suggest_loguniform('reg_lambda', 1e-5, 1.0), 
+                      'learning_rate': trial.suggest_loguniform('learning_rate', 1e-5, 1.0)}
         #パラメータ
         trial_params = trial.params
 
@@ -98,15 +113,16 @@ class Objective:
             #model
             if self.config['model_type'] == 'Lasso':
                 model = Lasso(**params, max_iter=10000, random_state=0)
-
-            model.fit(data_set['train'],label_set['train'])
+            elif self.config['model_type'] == 'XGB':
+                model = xgb.XGBRegressor(**params, random_state=0)
+            model.fit(data_set['train'], label_set['train'])
             #modelの保存
             model_dir = os.path.join(this_dir,'model')
             os.makedirs(model_dir, exist_ok=True)
             model_filename = os.path.join(model_dir,'{}_model_{}-{}.pkl'.format(self.config['model_type'],
                                                                                 trial_number,n))
             pickle.dump(model, open(model_filename, 'wb'))
-            if self.config['model_type'] == 'Lasso':
+            if self.config['model_type'] in ['Lasso', 'XGB']:
                 pred = model.predict(data_set['test'])
             else:
                 raise ValueError('Not defined model!')
@@ -117,14 +133,9 @@ class Objective:
 
         pred_sum = np.concatenate(pred_list)
         labels_sum = np.concatenate(labels_list)
-        score1, score2 = self.score_calculation(pred_sum, labels_sum) #score1: roc_auc or RMSE 
-                                                                         #score2: accuracy or R2
-        if self.config['dataset']['task'] == 'classification':
-            score = score1
-            print('trial No.{} ROC score: {:.3f}'.format(trial_number, score))
-        elif self.config['dataset']['task'] == 'regression':
-            score = score2
-            print('trial No.{} R2 score: {:.3f}'.format(trial_number, score))
+        score = self.score_calculation(pred_sum, labels_sum)
+        print('trial No.{} {} score: {:.3f}'.format(trial_number, self.config['evaluation_function'],
+                                                    score))
 
         #trialの保存
         param_dir = os.path.join(this_dir, 'params')
@@ -138,17 +149,28 @@ class Objective:
         if self.config['dataset']['task'] == 'classification':
             label_class = np.array(range(11))
             one_hot_labels = label_binarize(labels, classes=label_class)
-            try:
-                roc_auc = roc_auc_score(one_hot_labels, pred, multi_class='ovr')
-            except ValueError:
-                roc_auc = 'could not calculate'
             max_pred = np.argmax(pred, axis = 1)
-            accuracy = accuracy_score(labels, max_pred)
-            return roc_auc, accuracy
+            if self.config['evaluation_function'] == 'acu':
+                score = accuracy_score(labels, max_pred)
+            elif self.config['evaluation_function'] == 'roc':
+                try:
+                    score = roc_auc_score(one_hot_labels, pred, multi_class='ovr')
+                except ValueError:
+                    score = 'could not calculate'
+            else:
+                raise ValueError('Not suitable evaluation function!')
         elif self.config['dataset']['task'] == 'regression':
-            RMSE = mean_squared_error(labels, pred, squared=False)
-            R2 = r2_score(labels, pred)
-            return RMSE, R2
+            if self.config['evaluation_function'] == 'RMSE':
+                score = mean_squared_error(labels, pred, squared=False)
+            elif self.config['evaluation_function'] == 'MSE':
+                score = mean_absolute_error(labels, pred)
+            elif self.config['evaluation_function'] == 'RMSLE':
+                score = mean_squared_log_error(labels, pred, squared=False)
+            elif self.config['evaluation_function'] == 'R2':
+                score = r2_score(labels, pred)
+            else:
+                raise ValueError('Not suitable evaluation function!')
+        return score
 
 
 if __name__ == "__main__":
@@ -179,12 +201,18 @@ if __name__ == "__main__":
     #↓↓
     #パラメータチューニングの実行
     optuna.logging.enable_default_handler()#logの表示
-    TRIAL_SIZE = 10
+    TRIAL_SIZE = config['trial_size']
     objective = Objective(config)
-    study_name = '{}_{}_study_{}'.format(config['task_name'], config['model_type'], current_time)
-    study = optuna.create_study(study_name=study_name, 
-                                storage='sqlite:///'+study_name+".db",load_if_exists=True,
-                                direction='maximize')
+    os.makedirs('study', exist_ok=True)
+    study_name = os.path.join('study', '{}_{}_study_{}'.format(config['task_name'], config['model_type'], current_time)
+    if config['evaluation_function'] in ['acu', 'roc', 'R2']:
+        study = optuna.create_study(study_name=study_name, 
+                                    storage='sqlite:///'+study_name+".db",load_if_exists=True,
+                                    direction='maximize')
+    else:
+        study = optuna.create_study(study_name=study_name, 
+                                    storage='sqlite:///'+study_name+".db",load_if_exists=True,
+                                    direction='minimize')
     study.optimize(objective, n_trials=TRIAL_SIZE)
     
     best_trial = study.best_trial
@@ -199,12 +227,13 @@ if __name__ == "__main__":
     best_names = ['best_trial', 'best_value']
     for b_name, best in zip(best_names,bests):
         results_list.append([b_name, best])
-    
     os.makedirs('Optuna_results', exist_ok=True)
     df = pd.DataFrame(results_list)
     current_time = datetime.now().strftime('%y%m%d')
     if config['task_name'] == 'PC' or config['task_name'] == 'PC_rgr': 
-        df.to_csv('Optuna_results/{}_{}_{}_reults.csv'.format(config['task_name'],  config['model_type'], "-".join(config['rxn_type'])), mode='a', index=False, header=False)
+        df.to_csv('Optuna_results/{}_{}_{}_{}-reults.csv'.format(config['task_name'],  config['model_type'], "-".join(config['rxn_type']), config['evaluation_function']), mode='a', index=False, header=False)
     else:
-        df.to_csv('Optuna_results/{}_{}_reults.csv'.format(config['task_name'],  config['model_type']), mode='a', index=False, header=False)
+        df.to_csv('Optuna_results/{}_{}_{}-reults.csv'.format(config['task_name'],  config['model_type'], config['evaluation_function']), mode='a', index=False, header=False)
+
     print('Calculation is finished')
+    

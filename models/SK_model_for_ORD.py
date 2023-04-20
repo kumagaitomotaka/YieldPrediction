@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 import pickle
 from sklearn.preprocessing import label_binarize
+import xgboost as xgb
 
 class SK_model(object):
     def __init__(self, data_set, label_set, task='classification', model_type='RFC',task_name='ORD', fine_tune_form = 'pretraind_gin',coment = '',n=None,start_time=None):
@@ -42,6 +43,10 @@ class SK_model(object):
             os.makedirs('Lasso_data', exist_ok=True)
             self.this_calc_dir = 'Lasso_data/{}_{}_{}_{}'.format(self.task_name, self.fine_tune_form, self.coment, start_time)
             os.makedirs(self.this_calc_dir, exist_ok=True)
+        elif self.model_type == 'XGB':
+            os.makedirs('XGB_data', exist_ok=True)
+            self.this_calc_dir = 'XGB_data/{}_{}_{}_{}'.format(self.task_name, self.fine_tune_form, self.coment, start_time)
+            os.makedirs(self.this_calc_dir, exist_ok=True)
         else:
             raise ValueError('Undefined model type!')
         
@@ -55,6 +60,8 @@ class SK_model(object):
             pred = self.RF_Regressor()
         elif self.model_type == 'Lasso':
             pred = self.Lasso_rgr()
+        elif self.model_type == 'XGB':
+            pred = self.xgb_rgr()
         else:
             raise ValueError('Undefined model type!')
         #評価
@@ -69,6 +76,8 @@ class SK_model(object):
                 PandL_filename = os.path.join(self.this_calc_dir,'RFR_PandL_{}'.format(self.n))
             elif self.model_type == 'Lasso':
                 PandL_filename = os.path.join(self.this_calc_dir,'Lasso_PandL_{}'.format(self.n))
+            elif self.model_type == 'XGB':
+                PandL_filename = os.path.join(self.this_calc_dir,'XGB_PandL_{}'.format(self.n))
         else:
             if self.model_type == 'RFC':
                 PandL_filename = os.path.join(self.this_calc_dir,'RFC_PandL')
@@ -78,6 +87,8 @@ class SK_model(object):
                 PandL_filename = os.path.join(self.this_calc_dir,'RFR_PandL')
             elif self.model_type == 'Lasso':
                 PandL_filename = os.path.join(self.this_calc_dir,'Lasso_PandL')
+            elif self.model_type == 'XGB':
+                PandL_filename = os.path.join(self.this_calc_dir,'XGB_PandL')
         np.savez(PandL_filename, pred=pred,labels=labels)
         if self.task == 'classification':
             label_class = np.array(range(11))
@@ -157,5 +168,21 @@ class SK_model(object):
             pickle.dump(lasso, open(model_filename, 'wb'))
         #予測値
         pred = lasso.predict(self.test_data)
+        pred = np.array(pred)
+        return pred
+    
+    def xgb_rgr(self):
+        print('XGBoost calclation is started!')
+        xgbr = xgb.XGBRegressor(max_depth=3,n_jobs=-1, random_state=0)
+        xgbr.fit(self.train_data, self.train_labels)
+        #modelの保存
+        if self.n != None:
+            model_filename = os.path.join(self.this_calc_dir,'XGB_model_{}.pkl'.format(self.n))
+            pickle.dump(xgbr, open(model_filename, 'wb'))
+        else:
+            model_filename = os.path.join(self.this_calc_dir,'XGB_model.pkl')
+            pickle.dump(xgbr, open(model_filename, 'wb'))
+        #予測値
+        pred = xgbr.predict(self.test_data)
         pred = np.array(pred)
         return pred
