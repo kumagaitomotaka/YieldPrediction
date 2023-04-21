@@ -10,6 +10,7 @@ from datetime import datetime
 import pickle
 from sklearn.preprocessing import label_binarize
 import xgboost as xgb
+from sklearn.svm import SVR
 
 class SK_model(object):
     def __init__(self, data_set, label_set, task='classification', model_type='RFC',task_name='ORD', fine_tune_form = 'pretraind_gin',coment = '',n=None,start_time=None):
@@ -47,6 +48,10 @@ class SK_model(object):
             os.makedirs('XGB_data', exist_ok=True)
             self.this_calc_dir = 'XGB_data/{}_{}_{}_{}'.format(self.task_name, self.fine_tune_form, self.coment, start_time)
             os.makedirs(self.this_calc_dir, exist_ok=True)
+        elif self.model_type == 'SVR':
+            os.makedirs('SVR_data', exist_ok=True)
+            self.this_calc_dir = 'SVR_data/{}_{}_{}_{}'.format(self.task_name, self.fine_tune_form, self.coment, start_time)
+            os.makedirs(self.this_calc_dir, exist_ok=True)
         else:
             raise ValueError('Undefined model type!')
         
@@ -62,33 +67,17 @@ class SK_model(object):
             pred = self.Lasso_rgr()
         elif self.model_type == 'XGB':
             pred = self.xgb_rgr()
+        elif self.model_type == 'SVR':
+            pred = self.sv_rgr()
         else:
             raise ValueError('Undefined model type!')
         #評価
         labels = np.array(self.test_labels)
         #予測とラベルの保存
         if self.n != None:
-            if self.model_type == 'RFC':
-                PandL_filename = os.path.join(self.this_calc_dir,'RFC_PandL_{}'.format(self.n))
-            elif self.model_type == 'LR':
-                PandL_filename = os.path.join(self.this_calc_dir,'LR_PandL_{}'.format(self.n))
-            elif self.model_type == 'RFR':
-                PandL_filename = os.path.join(self.this_calc_dir,'RFR_PandL_{}'.format(self.n))
-            elif self.model_type == 'Lasso':
-                PandL_filename = os.path.join(self.this_calc_dir,'Lasso_PandL_{}'.format(self.n))
-            elif self.model_type == 'XGB':
-                PandL_filename = os.path.join(self.this_calc_dir,'XGB_PandL_{}'.format(self.n))
+            PandL_filename = os.path.join(self.this_calc_dir,'{}_PandL_{}'.format(self.model_type,self.n))
         else:
-            if self.model_type == 'RFC':
-                PandL_filename = os.path.join(self.this_calc_dir,'RFC_PandL')
-            elif self.model_type == 'LR':
-                PandL_filename = os.path.join(self.this_calc_dir,'LR_PandL')
-            elif self.model_type == 'RFR':
-                PandL_filename = os.path.join(self.this_calc_dir,'RFR_PandL')
-            elif self.model_type == 'Lasso':
-                PandL_filename = os.path.join(self.this_calc_dir,'Lasso_PandL')
-            elif self.model_type == 'XGB':
-                PandL_filename = os.path.join(self.this_calc_dir,'XGB_PandL')
+            PandL_filename = os.path.join(self.this_calc_dir,'{}_PandL'.format(self.model_type))
         np.savez(PandL_filename, pred=pred,labels=labels)
         if self.task == 'classification':
             label_class = np.array(range(11))
@@ -184,5 +173,21 @@ class SK_model(object):
             pickle.dump(xgbr, open(model_filename, 'wb'))
         #予測値
         pred = xgbr.predict(self.test_data)
+        pred = np.array(pred)
+        return pred
+    
+    def sv_rgr(self):
+        print('SVR calclation is started!')
+        svr = SVR()
+        svr.fit(self.train_data, self.train_labels)
+        #modelの保存
+        if self.n != None:
+            model_filename = os.path.join(self.this_calc_dir,'SVR_model_{}.pkl'.format(self.n))
+            pickle.dump(svr, open(model_filename, 'wb'))
+        else:
+            model_filename = os.path.join(self.this_calc_dir,'SVR_model.pkl')
+            pickle.dump(svr, open(model_filename, 'wb'))
+        #予測値
+        pred = svr.predict(self.test_data)
         pred = np.array(pred)
         return pred

@@ -16,6 +16,8 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from sklearn.metrics import roc_auc_score, accuracy_score, mean_squared_error, mean_absolute_error, r2_score, mean_squared_log_error
 from sklearn.linear_model import LogisticRegression, Lasso
+from sklearn.svm import SVR
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import label_binarize
 from sklearn.model_selection import KFold
 
@@ -23,11 +25,11 @@ import xgboost as xgb
 import optuna
 
 class Objective:
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, config, start_time):
+        self.config = config 
+        self.start_time = start_time
         
     def __call__(self, trial):
-        start_time = datetime.now().strftime('%y%m%d%H%M')
         os.makedirs('Optuna_data', exist_ok=True)
         if self.config['task_name'] == 'PC' or self.config['task_name'] == 'PC_rgr': 
             target_rxn= 'CN'
@@ -42,11 +44,12 @@ class Objective:
                 calc_dir = '{}_{}_{}_{}-fingerprint_{}'.format(self.config['task_name'], 
                                                                self.config['model_type'], 
                                                                rxn_names, self.config['fingerprint_type'],
-                                                               start_time)
+                                                               self.start_time)
             else:
                 calc_dir = '{}_{}_{}-fingerprint_{}'.format(self.config['task_name'], 
                                                             self.config['model_type'],
-                                                            self.config['fingerprint_type'], start_time)
+                                                            self.config['fingerprint_type'], 
+                                                            self.start_time)
             if self.config['calc']:
                 calc_dir += '+calc'
         elif self.config['calc']:
@@ -54,11 +57,12 @@ class Objective:
                 calc_dir = '{}_{}_{}_{}_only-calc_{}'.format(self.config['task_name'], 
                                                              self.config['model_type'], 
                                                              self.config['evaluation_function'],
-                                                             rxn_names, start_time)
+                                                             rxn_names, self.start_time)
             else:
                 calc_dir = '{}_{}_{}_only-calc_{}'.format(self.config['task_name'],
                                                           self.config['model_type'], 
-                                                          self.config['evaluation_function'], start_time)
+                                                          self.config['evaluation_function'], 
+                                                          self.start_time)
         this_dir = os.path.join('Optuna_data', calc_dir)
         os.makedirs(this_dir, exist_ok=True)
         #trial number
@@ -66,17 +70,27 @@ class Objective:
 
         #param
         if self.config['model_type'] == 'Lasso':
-            params = {'alpha' : trial.suggest_uniform('alpha', 0.0, 1.0)}
+            params = {'alpha' : trial.suggest_uniform('alpha', 0.0, 1.0), 
+                      'max_iter': int(trial.suffest_loguniform('max_iter', 100, 10000))}
         elif self.config['model_type'] == 'XGB':
             params = {'max_depth' : trial.suggest_int('max_depth', 3, 8, step=1), 
-                      'min_child_weight': trial.suggest_int('min_child_weight', 1, 5, step=1), 
-                      'gamma': trial.suggest_float('gamma', 0.0, 0.6, step=0.1), 
+                      'min_child_weight': trial.suggest_int('min_child_weight', 1, 10, step=1), 
+                      'gamma': trial.suggest_float('gamma', 0.0, 1.0, step=0.1), 
                       'subsample': trial.suggest_float('subsample', 0.6, 1.0, step=0.1), 
                       'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0, step=0.1),
-                      'reg_alpha': trial.suggest_loguniform('reg_alpha', 1e-5, 100), 
-                      'n_estimators': trial.suggest_loguniform('n_estimators', 10, 1000), 
+                      'reg_alpha': trial.suggest_loguniform('reg_alpha', 1e-3, 10), 
+                      'n_estimators': int(trial.suggest_loguniform('n_estimators', 10, 1000)), 
                       'reg_lambda': trial.suggest_loguniform('reg_lambda', 1e-5, 1.0), 
                       'learning_rate': trial.suggest_loguniform('learning_rate', 1e-5, 1.0)}
+        elif self.config['model_type'] == 'SVR':
+            params = {'C': trial.suggest_loguniform('C', 1e-2, 1000),
+                      'epsilon': trial.suggest_loguniform('epsilon', 1e-4, 1.0),
+                      'gamma': trial.suggest_loguniform('gamma', 1e-7, 1000)}
+        elif self.config['model_type'] == 'RFR':
+            params = {'n_estimators': int(trial.suggest_loguniform('n_estimators', 10, 1000)),
+                      'max_features': trial.suggest_categorical('max_features', ['sqrt', 'log2', None]),
+                      'min_samples_split': int(trial.suggest_loguniform('min_samples_split', 2, 1000)), 
+                      'max_depth': int(trial.suggest_loguniform('max_depth', 10, 1000))}
         #パラメータ
         trial_params = trial.params
 
@@ -95,7 +109,6 @@ class Objective:
         target_data_idx = list(range(len(target_data_arry)))
         kf = KFold(n_splits=self.config['n_splits'],shuffle=True,random_state=0)
         result_score = 0
-        start_time = datetime.now().strftime('%y%m%d%H%M')
         pred_list = []
         labels_list = []
         for n,(train_val_idx,test_idx) in enumerate(kf.split(target_data_idx)): 
@@ -112,9 +125,16 @@ class Objective:
 
             #model
             if self.config['model_type'] == 'Lasso':
-                model = Lasso(**params, max_iter=10000, random_state=0)
+                model = Lasso(**params, random_state=0)
             elif self.config['model_type'] == 'XGB':
                 model = xgb.XGBRegressor(**params, random_state=0)
+            elif self.config['model_type'] == 'SVR':
+                model = SVR(**params)
+            elif self.config['model_type'] == 'RFR':
+                model = RandomForestRegressor(**params, n_jobs=-1, random_state=0)
+            
+            #print(data_set['train'])
+            #print(label_set['train'])
             model.fit(data_set['train'], label_set['train'])
             #modelの保存
             model_dir = os.path.join(this_dir,'model')
@@ -122,7 +142,7 @@ class Objective:
             model_filename = os.path.join(model_dir,'{}_model_{}-{}.pkl'.format(self.config['model_type'],
                                                                                 trial_number,n))
             pickle.dump(model, open(model_filename, 'wb'))
-            if self.config['model_type'] in ['Lasso', 'XGB']:
+            if self.config['model_type'] in ['Lasso', 'XGB', 'SVR', 'RFR']:
                 pred = model.predict(data_set['test'])
             else:
                 raise ValueError('Not defined model!')
@@ -202,9 +222,9 @@ if __name__ == "__main__":
     #パラメータチューニングの実行
     optuna.logging.enable_default_handler()#logの表示
     TRIAL_SIZE = config['trial_size']
-    objective = Objective(config)
+    objective = Objective(config, current_time)
     os.makedirs('study', exist_ok=True)
-    study_name = os.path.join('study', '{}_{}_study_{}'.format(config['task_name'], config['model_type'], current_time)
+    study_name = os.path.join('study', '{}_{}_study_{}'.format(config['task_name'], config['model_type'], current_time))
     if config['evaluation_function'] in ['acu', 'roc', 'R2']:
         study = optuna.create_study(study_name=study_name, 
                                     storage='sqlite:///'+study_name+".db",load_if_exists=True,
