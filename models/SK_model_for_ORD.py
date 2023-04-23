@@ -191,3 +191,4 @@ class SK_model(object):
         pred = svr.predict(self.test_data)
         pred = np.array(pred)
         return pred
+    

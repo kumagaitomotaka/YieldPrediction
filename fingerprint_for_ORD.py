@@ -27,6 +27,7 @@ from sklearn.preprocessing import label_binarize
 from sklearn.model_selection import KFold
 import copy
 from models.SK_model_for_ORD import SK_model
+from models.SK_best_model import SK_best_model
 
 def read_csv(config,data_path, rxn_type, target_rxn=None):
     target = config['dataset']['target']
@@ -202,8 +203,11 @@ def main(config):
             for i,t in enumerate(config['rxn_type']):
                 if i > 0:
                     coment += '-'
-                coment += t    
-        sk_model = SK_model(data_set, label_set, config['dataset']['task'], config['model_type'],config['task_name'],None,coment)
+                coment += t
+        if config['best_model']:
+            sk_model = SK_best_model(config, data_set, label_set, coment='')
+        else:
+            sk_model = SK_model(data_set, label_set, config['dataset']['task'], config['model_type'],config['task_name'],'', coment)
         if config['dataset']['task'] == 'classification':
             roc_auc, accuary = sk_model.calc()
             print('ROC-AUC score: {}, accuarcy: {}'.format(roc_auc, accuary))
@@ -260,10 +264,13 @@ def main(config):
                     if i > 0:
                         coment += '-'
                     coment += t
-            if config['fingerprint']:
-                sk_model = SK_model(data_set, label_set, config['dataset']['task'], config['model_type'],
-                                    config['task_name'],config['fingerprint_type'],coment, n=n,
-                                    start_time=start_time)
+            if config['best_model']:
+                    sk_model = SK_best_model(config, data_set, label_set, coment='', n=n,
+                                             start_time=start_time)
+            elif config['fingerprint']:
+                sk_model = SK_model(data_set, label_set, config['dataset']['task'],
+                                    config['model_type'], config['task_name'], 
+                                    config['fingerprint_type'],coment, n=n, start_time=start_time)
             else:
                 sk_model = SK_model(data_set, label_set, config['dataset']['task'], config['model_type'],
                                     config['task_name'],'',coment, n=n,
@@ -308,14 +315,17 @@ def main(config):
             for i,t in enumerate(config['rxn_type']):
                 if i > 0:
                     coment += '-'
-                coment += t    
+                coment += t 
+        if config['best_model']:
+                    sk_model = SK_best_model(config, data_set, label_set, coment='', n=None,
+                                             start_time=start_time)
         if config['fingerprint']:
             sk_model = SK_model(data_set, label_set, config['dataset']['task'], config['model_type'],
-                                    config['task_name'],config['fingerprint_type'],coment, n=n,
+                                    config['task_name'],config['fingerprint_type'],coment, n=None,
                                     start_time=start_time)
         else:
             sk_model = SK_model(data_set, label_set, config['dataset']['task'], config['model_type'],
-                                    config['task_name'],'',coment, n=n,
+                                    config['task_name'],'',coment, n=None,
                                     start_time=start_time)
         if config['dataset']['task'] == 'classification':
             roc_auc, accuary = sk_model.calc()

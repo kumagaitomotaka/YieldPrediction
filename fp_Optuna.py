@@ -7,6 +7,8 @@ import pandas as pd
 from datetime import datetime
 import copy
 import pickle
+import warnings
+warnings.simplefilter('ignore', FutureWarning) #FutureWarningの非表示
 
 import torch
 from torch import nn
@@ -45,13 +47,17 @@ class Objective:
                                                                self.config['model_type'], 
                                                                rxn_names, self.config['fingerprint_type'],
                                                                self.start_time)
+                if self.config['calc']:
+                    calc_dir += '{}_{}_{}_{}-fingerprint+calc_{}'.format(self.config['task_name'], 
+                                                                self.config['model_type'],
+                                                                self.config['fingerprint_type'],
+                                                                rxn_names,
+                                                                self.start_time)
             else:
                 calc_dir = '{}_{}_{}-fingerprint_{}'.format(self.config['task_name'], 
                                                             self.config['model_type'],
                                                             self.config['fingerprint_type'], 
                                                             self.start_time)
-            if self.config['calc']:
-                calc_dir += '+calc'
         elif self.config['calc']:
             if self.config['task_name'] == 'PC' or self.config['task_name'] == 'PC_rgr':
                 calc_dir = '{}_{}_{}_{}_only-calc_{}'.format(self.config['task_name'], 
@@ -71,7 +77,7 @@ class Objective:
         #param
         if self.config['model_type'] == 'Lasso':
             params = {'alpha' : trial.suggest_uniform('alpha', 0.0, 1.0), 
-                      'max_iter': int(trial.suffest_loguniform('max_iter', 100, 10000))}
+                      'max_iter': int(trial.suggest_loguniform('max_iter', 100, 10000))}
         elif self.config['model_type'] == 'XGB':
             params = {'max_depth' : trial.suggest_int('max_depth', 3, 8, step=1), 
                       'min_child_weight': trial.suggest_int('min_child_weight', 1, 10, step=1), 
@@ -220,11 +226,12 @@ if __name__ == "__main__":
     print(config)
     #↓↓
     #パラメータチューニングの実行
-    optuna.logging.enable_default_handler()#logの表示
+    #optuna.logging.enable_default_handler()#logの表示
+    optuna.logging.disable_default_handler()#logを非表示
     TRIAL_SIZE = config['trial_size']
     objective = Objective(config, current_time)
     os.makedirs('study', exist_ok=True)
-    study_name = os.path.join('study', '{}_{}_study_{}'.format(config['task_name'], config['model_type'], current_time))
+    study_name = os.path.join('study', '{}_{}_{}_study_{}'.format(config['task_name'], config['model_type'], "-".join(config['rxn_type']), current_time))
     if config['evaluation_function'] in ['acu', 'roc', 'R2']:
         study = optuna.create_study(study_name=study_name, 
                                     storage='sqlite:///'+study_name+".db",load_if_exists=True,
@@ -236,15 +243,19 @@ if __name__ == "__main__":
     study.optimize(objective, n_trials=TRIAL_SIZE)
     
     best_trial = study.best_trial
+    best_num = study.best_trial.number
     best_value = study.best_value
+    best_params = study.best_params
     
-    bests = [best_trial,best_value]
+    bests = [best_num, best_value, best_params]
     
+    print('best number:', best_num)
     print('best value:', best_value)
+    print('best params:', best_params)
     print('best trial')
     print(best_trial)
     results_list = []
-    best_names = ['best_trial', 'best_value']
+    best_names = ['best num' 'best value', 'best param']
     for b_name, best in zip(best_names,bests):
         results_list.append([b_name, best])
     os.makedirs('Optuna_results', exist_ok=True)

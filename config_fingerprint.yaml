@@ -12,12 +12,13 @@ task_name: PC_rgr                  # name of fine-tuning benchmark, inlcuding
                                 # regressions: ORD_rgr/PC_rgr
 rxn_type:                       # for only PC/PC_rgr, you can select PC_rxn_type (list)
  - CN                           #CN/CO_90/CO_450/CP_bp  
- - CO_90
- - CO_450
+# - CO_90
+# - CO_450
 # - CO_dp
 fingerprint_type: morgan        # name of fingerprint: morgan
 add_temp: False                 
-model_type: SVR               # model selection: RFC/LR/RFR/Lasso/XGB/SVR
+model_type: RFR               # model selection: RFC/LR/RFR/Lasso/XGB/SVR
+best_model: True              #use best parameters
 ORD_train: False               # use ORD data as train
 fingerprint: False              # use fingerprint
 calc: True                     # use calculation data
@@ -35,3 +36,9 @@ dataset:
   valid_size: 0.0              # ratio of validation data
   test_size: 0.1                # ratio of test data
   #splitting: random          # data splitting (i.e., random/scaffold)
+
+best:
+  evaluation_function: R2      #Evaluation function: classifier: acu/roc
+                                                     #rgressor: R2/RMSE/MSE/RMSLE
+  trial_num: 902
+  trial_date: 2304231207
