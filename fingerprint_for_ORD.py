@@ -205,7 +205,7 @@ def main(config):
                     coment += '-'
                 coment += t
         if config['best_model']:
-            sk_model = SK_best_model(config, data_set, label_set, coment='')
+            sk_model = SK_best_model(config, data_set, label_set, coment=coment)
         else:
             sk_model = SK_model(data_set, label_set, config['dataset']['task'], config['model_type'],config['task_name'],'', coment)
         if config['dataset']['task'] == 'classification':
@@ -265,7 +265,7 @@ def main(config):
                         coment += '-'
                     coment += t
             if config['best_model']:
-                    sk_model = SK_best_model(config, data_set, label_set, coment='', n=n,
+                    sk_model = SK_best_model(config, data_set, label_set, coment=coment, n=n,
                                              start_time=start_time)
             elif config['fingerprint']:
                 sk_model = SK_model(data_set, label_set, config['dataset']['task'],
@@ -317,7 +317,7 @@ def main(config):
                     coment += '-'
                 coment += t 
         if config['best_model']:
-                    sk_model = SK_best_model(config, data_set, label_set, coment='', n=None,
+                    sk_model = SK_best_model(config, data_set, label_set, coment=coment, n=None,
                                              start_time=start_time)
         if config['fingerprint']:
             sk_model = SK_model(data_set, label_set, config['dataset']['task'], config['model_type'],

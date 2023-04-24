@@ -255,7 +255,7 @@ if __name__ == "__main__":
     print('best trial')
     print(best_trial)
     results_list = []
-    best_names = ['best num' 'best value', 'best param']
+    best_names = ['best num', 'best value', 'best param']
     for b_name, best in zip(best_names,bests):
         results_list.append([b_name, best])
     os.makedirs('Optuna_results', exist_ok=True)
