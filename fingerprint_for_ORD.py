@@ -1,28 +1,18 @@
 import os
 import csv
 import shutil
-import sys
 import yaml
 import numpy as np
 import pandas as pd
 from datetime import datetime
 
-import torch
-from torch import nn
-import torch.nn.functional as F
-from torch.utils.tensorboard import SummaryWriter
-from torch.optim.lr_scheduler import CosineAnnealingLR
-from sklearn.metrics import roc_auc_score, accuracy_score, mean_squared_error, mean_absolute_error
-
 import rdkit
 from rdkit import Chem
-from rdkit.Chem.rdchem import HybridizationType
-from rdkit.Chem.rdchem import BondType as BT
 from rdkit.Chem import AllChem
-from rdkit.Chem.Scaffolds.MurckoScaffold import MurckoScaffoldSmiles
 from rdkit import RDLogger   
 RDLogger.DisableLog('rdApp.*')  
 
+from sklearn.metrics import roc_auc_score, accuracy_score, mean_squared_error, mean_absolute_error
 from sklearn.preprocessing import label_binarize
 from sklearn.model_selection import KFold
 import copy
@@ -37,7 +27,10 @@ def read_csv(config,data_path, rxn_type, target_rxn=None):
     data_list = []
     target_data_list = []
     smiles_name_list = ['smiles0','smiles1','smiles2','product_smiles']
-    calc_name_list = ['HOMO', 'LUMO', 'DM_g', 'E_S1', 'f_S1', 'E_T1', 'dEST']
+    if config['std']:
+        calc_name_list = ['std_HOMO', 'std_LUMO', 'std_DM_g', 'std_E_S1', 'std_f_S1', 'std_E_T1', 'std_dEST']
+    else:
+        calc_name_list = ['HOMO', 'LUMO', 'DM_g', 'E_S1', 'f_S1', 'E_T1', 'dEST']
     if target_rxn != None:
         if target_rxn not in rxn_type:
             raise ValueError('target_rxn must be incuded in rxn_type') 
@@ -139,44 +132,9 @@ def _save_config_file(model_checkpoints_folder):
         shutil.copy('./config_fingerprint.yaml', os.path.join(model_checkpoints_folder, 'config_fingerprint.yaml'))
 
     
-def save_calc_results(epoch_list,train_loss_list,valid_loss_list,predictions,labels,n=None):
-    current_time = datetime.now().strftime('%y%m%d')
-    if config['model_type'] == 'gin':
-        os.makedirs('GIN_data', exist_ok=True)
-        model_data_dir = 'GIN_data'
-    elif config['model_type'] == 'gcn':
-        os.makedirs('GCN_data', exist_ok=True)
-        model_data_dir = 'GCN_data'
-    else:
-        raise ValueError('Undefined model type!')
-    if config['task_name'] == 'PC' or config['task_name'] == 'PC_rgr': 
-        rxn_name = ''
-        for i,rtype in enumerate(config['rxn_type']):
-            if i > 0:
-                rxn_name += '-'
-            rxn_name += rtype
-        if config['ORD_train']:
-            anal_data_dir = os.path.join(model_data_dir, '{}_{}_{}_{}_{}epoch_{}'.format(config['task_name'], 'ORD-train', config['fine_tune_from'], rxn_name, config['epochs'],current_time))
-        else:
-            anal_data_dir = os.path.join(model_data_dir, '{}_{}_{}_{}epoch_{}'.format(config['task_name'], config['fine_tune_from'], rxn_name, config['epochs'],current_time))
-    else:
-        anal_data_dir = os.path.join(model_data_dir, '{}_{}_{}epoch_{}'.format(config['task_name'], config['fine_tune_from'],config['epochs'],current_time))
-    os.makedirs(anal_data_dir, exist_ok=True)
-    if n != None:
-        loss_df = pd.DataFrame({'epoch':epoch_list,'train_loss':train_loss_list,'valid_loss':valid_loss_list})
-        loss_file = os.path.join(anal_data_dir, '{}_finetune_loss_data_{}.csv'.format(config['model_type'],n))
-        loss_df.to_csv(loss_file, mode='w', index=False)
-        p_l_file = os.path.join(anal_data_dir, '{}_finetune_pred_and_labels_{}'.format(config['model_type'],n))
-        np.savez(p_l_file, pred=predictions,labels=labels)
-    else:
-        loss_df = pd.DataFrame({'epoch':epoch_list,'train_loss':train_loss_list,'valid_loss':valid_loss_list})
-        loss_file = os.path.join(anal_data_dir, '{}_finetune_loss_data.csv'.format(config['model_type']))
-        loss_df.to_csv(loss_file, mode='w', index=False)
-        p_l_file = os.path.join(anal_data_dir, '{}_finetune_pred_and_labels'.format(config['model_type']))
-        np.savez(p_l_file, pred=predictions,labels=labels)
-
             
 def main(config):
+    seed = 0
     if config['task_name'] == 'PC' or config['task_name'] == 'PC_rgr': 
         target_rxn= 'CN'
     else:
@@ -207,7 +165,7 @@ def main(config):
         if config['best_model']:
             sk_model = SK_best_model(config, data_set, label_set, coment=coment)
         else:
-            sk_model = SK_model(data_set, label_set, config['dataset']['task'], config['model_type'],config['task_name'],'', coment)
+            sk_model = SK_model(data_set, label_set, config,'', coment)
         if config['dataset']['task'] == 'classification':
             roc_auc, accuary = sk_model.calc()
             print('ROC-AUC score: {}, accuarcy: {}'.format(roc_auc, accuary))
@@ -232,7 +190,7 @@ def main(config):
         
         #smiles -> train_val/test_smiles (CV)
         target_data_idx = list(range(len(target_data_arry)))
-        kf = KFold(n_splits=config['n_splits'],shuffle=True,random_state=0)
+        kf = KFold(n_splits=config['n_splits'],shuffle=True,random_state=seed)
         result_score = 0
         start_time = datetime.now().strftime('%y%m%d%H%M')
         for n,(train_val_idx,test_idx) in enumerate(kf.split(target_data_idx)): 
@@ -268,12 +226,10 @@ def main(config):
                     sk_model = SK_best_model(config, data_set, label_set, coment=coment, n=n,
                                              start_time=start_time)
             elif config['fingerprint']:
-                sk_model = SK_model(data_set, label_set, config['dataset']['task'],
-                                    config['model_type'], config['task_name'], 
+                sk_model = SK_model(data_set, label_set, config, 
                                     config['fingerprint_type'],coment, n=n, start_time=start_time)
             else:
-                sk_model = SK_model(data_set, label_set, config['dataset']['task'], config['model_type'],
-                                    config['task_name'],'',coment, n=n,
+                sk_model = SK_model(data_set, label_set, config,'',coment, n=n,
                                     start_time=start_time)
             if config['dataset']['task'] == 'classification':
                 roc_auc, accuary = sk_model.calc()
@@ -293,10 +249,6 @@ def main(config):
         elif config['task_name'] == 'PC' or config['task_name'] == 'PC_rgr': 
             target_data_list, target_labels = read_csv(config, data_path=config['dataset']['data_path'], 
                                                        rxn_type=config['rxn_type'], target_rxn=None)
-        for e in target_data_list:
-            if len(e) != 8192:
-                print(len(e))
-                print(e)
         target_data_array = np.array(target_data_list, dtype='float32')
         target_labels_array = np.array(target_labels, dtype='float32')
         target_data_set = [target_data_array, target_labels_array]
@@ -320,12 +272,10 @@ def main(config):
                     sk_model = SK_best_model(config, data_set, label_set, coment=coment, n=None,
                                              start_time=start_time)
         if config['fingerprint']:
-            sk_model = SK_model(data_set, label_set, config['dataset']['task'], config['model_type'],
-                                    config['task_name'],config['fingerprint_type'],coment, n=None,
-                                    start_time=start_time)
+            sk_model = SK_model(data_set, label_set, config, config['fingerprint_type'],
+                                coment, n=None, start_time=start_time)
         else:
-            sk_model = SK_model(data_set, label_set, config['dataset']['task'], config['model_type'],
-                                    config['task_name'],'',coment, n=None,
+            sk_model = SK_model(data_set, label_set, config,'',coment, n=None,
                                     start_time=start_time)
         if config['dataset']['task'] == 'classification':
             roc_auc, accuary = sk_model.calc()

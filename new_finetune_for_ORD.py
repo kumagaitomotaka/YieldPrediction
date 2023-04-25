@@ -560,7 +560,7 @@ def h_main(config):
                     if i > 0:
                         coment += '-'
                     coment += t    
-            sk_model = SK_model(h_set, label_set, config['dataset']['task'], config['check_model'],config['task_name'],config['fine_tune_from'],coment)
+            sk_model = SK_model(h_set, label_set, config, config['fine_tune_from'],coment)
             if config['dataset']['task'] == 'classification':
                 roc_auc, accuary = sk_model.calc()
                 print('ROC-AUC score: {}, accuarcy: {}'.format(roc_auc, accuary))
@@ -624,8 +624,7 @@ def h_main(config):
                         if i > 0:
                             coment += '-'
                         coment += t
-                sk_model = SK_model(h_set, label_set, config['dataset']['task'], config['check_model'],
-                                    config['task_name'],config['fine_tune_from'],coment, n=n,
+                sk_model = SK_model(h_set, label_set, config, config['fine_tune_from'],coment, n=n,
                                     start_time=start_time)
                 if config['dataset']['task'] == 'classification':
                     roc_auc, accuary = sk_model.calc()
@@ -662,7 +661,7 @@ def h_main(config):
                     if i > 0:
                         coment += '-'
                     coment += t    
-            sk_model = SK_model(h_set, label_set, config['dataset']['task'], config['check_model'],config['task_name'],config['fine_tune_from'],coment)
+            sk_model = SK_model(h_set, label_set, config, config['fine_tune_from'],coment)
             if config['dataset']['task'] == 'classification':
                 roc_auc, accuary = sk_model.calc()
                 print('ROC-AUC score: {}, accuarcy: {}'.format(roc_auc, accuary))

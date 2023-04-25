@@ -11,17 +11,18 @@ import pickle
 from sklearn.preprocessing import label_binarize
 import xgboost as xgb
 from sklearn.svm import SVR
+from sklearn.preprocessing import StandardScaler
 
 class SK_best_model(object):
-    def __init__(self, config, data_set, label_set, coment='', n=None,start_time=None):
+    def __init__(self, config, data_set, label_set, coment='', n=None, start_time=None):
         self.config = config
         self.train_data = data_set['train']
         self.valid_data = data_set['valid']
         self.test_data = data_set['test']
+        self.coment = coment
         self.train_labels = label_set['train']
         self.valid_labels = label_set['valid']
         self.test_labels = label_set['test']
-        self.coment = coment
         self.n = n
         if start_time == None:
             start_time = datetime.now().strftime('%y%m%d%H%M')
