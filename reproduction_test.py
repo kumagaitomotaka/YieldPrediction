@@ -159,8 +159,8 @@ if __name__ == "__main__":
         df = pd.DataFrame(results_list, columns = ['seed', 'CV', 'test'])
     current_time = datetime.now().strftime('%y%m%d')
     if config['std']:
-        csv_name = os.path.join(repro_dir, '{}_{}_{}_std_{}.csv'.format(config['task_name'],  config['model_type'], "-".join(config['rxn_type']), current_time))
+        csv_name = os.path.join(repro_dir, '{}_{}_{}_std_gap_-dEST_{}.csv'.format(config['task_name'],  config['model_type'], "-".join(config['rxn_type']), current_time))
     else:
-        csv_name = os.path.join(repro_dir, '{}_{}_{}_no-std_{}.csv'.format(config['task_name'],  config['model_type'], "-".join(config['rxn_type']), current_time))
+        csv_name = os.path.join(repro_dir, '{}_{}_{}_no-std_gap_-dEST_{}.csv'.format(config['task_name'],  config['model_type'], "-".join(config['rxn_type']), current_time))
     df.to_csv(csv_name, mode='a', index=False, header=True)
     print('Calculation is finished')

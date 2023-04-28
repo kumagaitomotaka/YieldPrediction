@@ -7,12 +7,13 @@ rxn_type:                       # for only PC/PC_rgr, you can select PC_rxn_type
  - CO_450
 # - CO_dp
 fingerprint_type: morgan        # name of fingerprint: morgan              
-model_type: RFR                 # model selection: RFR/Lasso/XGB/SVR
+model_type: XGB                 # model selection: RFR/Lasso/XGB/SVR
 fingerprint: False              # use fingerprint
 calc: True                     # use calculation data
+std: True                      # use standerized calculation data
 n_splits: 2                    # numbaer of split in K-forld
 trial_size: 1000                    #Optuna trial size
-evaluation_function: RMSE      #Evaluation function: classifier: acu/roc
+evaluation_function: R2      #Evaluation function: classifier: acu/roc
                                                      #rgressor: R2/RMSE/MSE/RMSLE
 
 dataset:

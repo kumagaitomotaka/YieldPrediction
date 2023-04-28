@@ -28,7 +28,7 @@ def read_csv(config,data_path, rxn_type, target_rxn=None):
     target_data_list = []
     smiles_name_list = ['smiles0','smiles1','smiles2','product_smiles']
     if config['std']:
-        calc_name_list = ['std_HOMO', 'std_LUMO', 'std_DM_g', 'std_E_S1', 'std_f_S1', 'std_E_T1', 'std_dEST']
+        calc_name_list = ['std_HOMO', 'std_LUMO', 'std_DM_g', 'std_E_S1', 'std_f_S1', 'std_E_T1']
     else:
         calc_name_list = ['HOMO', 'LUMO', 'DM_g', 'E_S1', 'f_S1', 'E_T1', 'dEST']
     if target_rxn != None:

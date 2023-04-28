@@ -28,28 +28,29 @@ class SK_best_model(object):
             start_time = datetime.now().strftime('%y%m%d%H%M')
         if self.config['model_type'] == 'RFR':
             os.makedirs('RFR_data', exist_ok=True)
-            self.this_calc_dir = 'RFR_data/{}_{}_bestmodel_{}_{}'.format(self.config['task_name'], 
+            self.this_calc_dir = 'RFR_data/std_-dEST_{}_{}_bestmodel_{}_{}'.format(self.config['task_name'], 
                                                     self.config['best']['evaluation_function'],
                                                                self.coment, start_time)
             os.makedirs(self.this_calc_dir, exist_ok=True)
         elif self.config['model_type'] == 'Lasso':
             os.makedirs('Lasso_data', exist_ok=True)
-            self.this_calc_dir = 'Lasso_data/{}_{}_bestmodel_{}_{}'.format(self.config['task_name'], 
+            self.this_calc_dir = 'Lasso_data/std_-dEST_{}_{}_bestmodel_{}_{}'.format(self.config['task_name'], 
                                                     self.config['best']['evaluation_function'],
                                                                self.coment, start_time)
             os.makedirs(self.this_calc_dir, exist_ok=True)
         elif self.config['model_type'] == 'XGB':
             os.makedirs('XGB_data', exist_ok=True)
-            self.this_calc_dir = 'XGB_data/{}_{}_bestmodel_{}_{}'.format(self.config['task_name'], 
+            self.this_calc_dir = 'XGB_data/std_-dEST_{}_{}_bestmodel_{}_{}'.format(self.config['task_name'], 
                                                     self.config['best']['evaluation_function'],
                                                                self.coment, start_time)
             os.makedirs(self.this_calc_dir, exist_ok=True)
         elif self.config['model_type'] == 'SVR':
             os.makedirs('SVR_data', exist_ok=True)
-            self.this_calc_dir = 'SVR_data/{}_{}_bestmodel_{}_{}'.format(self.config['task_name'], 
+            self.this_calc_dir = 'SVR_data/std_-dEST_{}_{}_bestmodel_{}_{}'.format(self.config['task_name'], 
                                                     self.config['best']['evaluation_function'],
                                                                self.coment, start_time)
-            os.makedirs(self.this_calc_dir, exist_ok=True)
+            if self.config['train_test'] != True:
+                os.makedirs(self.this_calc_dir, exist_ok=True)
         else:
             raise ValueError('Undefined model type!')
         
@@ -70,7 +71,7 @@ class SK_best_model(object):
                                                             self.config['fingerprint_type'])
         elif self.config['calc']:
             if self.config['task_name'] == 'PC' or self.config['task_name'] == 'PC_rgr':
-                calc_dir = '{}_{}_{}_{}_only-calc_{}'.format(self.config['task_name'], 
+                calc_dir = 'std_-dEST{}_{}_{}_{}_only-calc_{}'.format(self.config['task_name'], 
                                                              self.config['model_type'], 
                                                         self.config['best']['evaluation_function'],
                                                              "-".join(config['rxn_type']),
@@ -86,7 +87,112 @@ class SK_best_model(object):
         with open(param_path, 'rb') as f:
             self.params = pickle.load(f)
         
-    
+    def calc(self):
+        if self.config['train_test']:
+            train_pred, pred = self.best_calc_model()
+            #評価
+            train_labels = np.array(self.train_labels)
+            labels = np.array(self.test_labels)
+            if self.config['dataset']['task'] == 'classification':
+                label_class = np.array(range(11))
+                one_hot_train_labels = label_binarize(train_labels, classes=label_class)
+                one_hot_labels = label_binarize(labels, classes=label_class)
+                try:
+                    train_roc_auc = roc_auc_score(one_hot_train_labels, train_pred, multi_class='ovr')
+                    roc_auc = roc_auc_score(one_hot_labels, pred, multi_class='ovr')
+                except ValueError:
+                    train_roc_auc = 'could not calculate'
+                    roc_auc = 'could not calculate'
+                max_train_pred = np.argmax(train_pred, axis = 1)
+                max_pred = np.argmax(pred, axis = 1)
+                train_accuracy = accuracy_score(train_labels, max_train_pred)
+                accuracy = accuracy_score(labels, max_pred)
+                train_score = [train_roc_auc, train_accuracy]
+                test_score = [roc_auc, accuracy]
+                return train_score, test_score
+            elif self.config['dataset']['task'] == 'regression':
+                train_RMSE = mean_squared_error(train_labels, train_pred, squared=False)
+                train_R2 = r2_score(train_labels, train_pred)
+                RMSE = mean_squared_error(labels, pred, squared=False)
+                R2 = r2_score(labels, pred)
+                train_score = [train_RMSE, train_R2]
+                test_score = [RMSE, R2]
+                return train_score, test_score
+        else:
+            pred = self.best_calc_model()
+            #評価
+            labels = np.array(self.test_labels)
+            #予測とラベルの保存
+            if self.n != None:
+                PandL_filename = os.path.join(self.this_calc_dir,'{}_PandL_{}'.format(self.config['model_type'],self.n))
+            else:
+                PandL_filename = os.path.join(self.this_calc_dir,'{}_PandL'.format(self.config['model_type']))
+            np.savez(PandL_filename, pred=pred,labels=labels)
+            if self.config['dataset']['task'] == 'classification':
+                label_class = np.array(range(11))
+                one_hot_labels = label_binarize(labels, classes=label_class)
+                try:
+                    roc_auc = roc_auc_score(one_hot_labels, pred, multi_class='ovr')
+                except ValueError:
+                    roc_auc = 'could not calculate'
+                max_pred = np.argmax(pred, axis = 1)
+                accuracy = accuracy_score(labels, max_pred)
+                return roc_auc, accuracy
+            elif self.config['dataset']['task'] == 'regression':
+                RMSE = mean_squared_error(labels, pred, squared=False)
+                R2 = r2_score(labels, pred)
+                return RMSE, R2
+        
+    def best_calc_model(self):
+        print('best {} calculation is started!'.format(self.config['model_type']))
+        if self.config['model_type'] == 'RFC':
+            model = RandomForestClassifier(n_jobs=-1, random_state=0)
+        elif self.config['model_type'] == 'LR':
+            model = LogisticRegression(max_iter=10000,random_state=0)
+        elif self.config['model_type'] == 'RFR':
+            self.params['n_estimators'] = int(self.params['n_estimators'])
+            self.params['min_samples_split'] = int(self.params['min_samples_split'])
+            self.params['max_depth'] = int(self.params['max_depth'])
+            model = RandomForestRegressor(**self.params, n_jobs=-1, random_state=0)
+        elif self.config['model_type'] == 'Lasso':
+            self.params['max_iter'] = int(self.params['max_iter'])
+            model = Lasso(**self.params, random_state=0)
+        elif self.config['model_type'] == 'XGB':
+            self.params['n_estimators'] = int(self.params['n_estimators'])
+            model = xgb.XGBRegressor(**self.params, random_state=0)
+        elif self.config['model_type'] == 'SVR':
+            model = SVR(**self.params)
+        else:
+            raise ValueError('Undefined model type!')
+        model.fit(self.train_data, self.train_labels)
+        if self.config['train_test'] != True:
+            #modelの保存
+            if self.n != None:
+                model_filename = os.path.join(self.this_calc_dir,'{}_model_{}.pkl'.format(self.config['model_type'], self.n))
+                pickle.dump(model, open(model_filename, 'wb'))
+            else:
+                model_filename = os.path.join(self.this_calc_dir,'{}_model.pkl'.format(self.config['model_type']))
+                pickle.dump(model, open(model_filename, 'wb'))
+        #予測値
+        if self.config['train_test']:
+            if self.config['model_type'] in ['RFC', 'LR']:
+                train_pred = model.predict_proba(self.train_data)
+                pred = model.predict_proba(self.test_data)
+            else:
+                train_pred = model.predict(self.train_data)
+                pred = model.predict(self.test_data)
+            train_pred = np.array(train_pred)
+            pred = np.array(pred)
+            return train_pred, pred
+        else:
+            if self.config['model_type'] in ['RFC', 'LR']:
+                pred = model.predict_proba(self.test_data)
+            else:
+                pred = model.predict(self.test_data)
+            pred = np.array(pred)
+            return pred
+        
+'''
     def calc(self):
         if self.config['model_type'] == 'RFR':
             pred = self.best_RF_Regressor()
@@ -223,4 +329,4 @@ class SK_best_model(object):
         pred = svr.predict(self.test_data)
         pred = np.array(pred)
         return pred
-    
+'''

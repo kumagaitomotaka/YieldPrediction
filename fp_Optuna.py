@@ -69,6 +69,8 @@ class Objective:
                                                           self.config['model_type'], 
                                                           self.config['evaluation_function'], 
                                                           self.start_time)
+        if self.config['std']:
+            calc_dir = 'std_-dEST' + calc_dir
         this_dir = os.path.join('Optuna_data', calc_dir)
         os.makedirs(this_dir, exist_ok=True)
         #trial number
