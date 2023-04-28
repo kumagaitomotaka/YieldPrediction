@@ -26,29 +26,14 @@ class SK_best_model(object):
         self.n = n
         if start_time == None:
             start_time = datetime.now().strftime('%y%m%d%H%M')
-        if self.config['model_type'] == 'RFR':
-            os.makedirs('RFR_data', exist_ok=True)
-            self.this_calc_dir = 'RFR_data/std_-dEST_{}_{}_bestmodel_{}_{}'.format(self.config['task_name'], 
-                                                    self.config['best']['evaluation_function'],
-                                                               self.coment, start_time)
-            os.makedirs(self.this_calc_dir, exist_ok=True)
-        elif self.config['model_type'] == 'Lasso':
-            os.makedirs('Lasso_data', exist_ok=True)
-            self.this_calc_dir = 'Lasso_data/std_-dEST_{}_{}_bestmodel_{}_{}'.format(self.config['task_name'], 
-                                                    self.config['best']['evaluation_function'],
-                                                               self.coment, start_time)
-            os.makedirs(self.this_calc_dir, exist_ok=True)
-        elif self.config['model_type'] == 'XGB':
-            os.makedirs('XGB_data', exist_ok=True)
-            self.this_calc_dir = 'XGB_data/std_-dEST_{}_{}_bestmodel_{}_{}'.format(self.config['task_name'], 
-                                                    self.config['best']['evaluation_function'],
-                                                               self.coment, start_time)
-            os.makedirs(self.this_calc_dir, exist_ok=True)
-        elif self.config['model_type'] == 'SVR':
-            os.makedirs('SVR_data', exist_ok=True)
-            self.this_calc_dir = 'SVR_data/std_-dEST_{}_{}_bestmodel_{}_{}'.format(self.config['task_name'], 
-                                                    self.config['best']['evaluation_function'],
-                                                               self.coment, start_time)
+        if self.config['model_type'] in ['RFR', 'Lasso', 'XGB','SVR']:
+            data_dir = '{}_data'.format(self.config['model_type'])
+            os.makedirs(data_dir, exist_ok=True)
+            if self.config['std']:
+                self.this_calc_dir = os.path.join(data_dir,
+                                                  'std_-dEST_{}_{}_bestmodel_{}_{}'.format(self.config['task_name'], self.config['best']['evaluation_function'], self.coment, start_time))
+            else:
+                self.this_calc_dir = os.path.join(data_dir, '{}_{}_bestmodel_{}_{}'.format(self.config['task_name'], self.config['best']['evaluation_function'], self.coment, start_time))
             if self.config['train_test'] != True:
                 os.makedirs(self.this_calc_dir, exist_ok=True)
         else:
@@ -71,7 +56,14 @@ class SK_best_model(object):
                                                             self.config['fingerprint_type'])
         elif self.config['calc']:
             if self.config['task_name'] == 'PC' or self.config['task_name'] == 'PC_rgr':
-                calc_dir = 'std_-dEST{}_{}_{}_{}_only-calc_{}'.format(self.config['task_name'], 
+                if self.config['std']:
+                    calc_dir = 'std_-dEST{}_{}_{}_{}_only-calc_{}'.format(self.config['task_name'], 
+                                                             self.config['model_type'], 
+                                                        self.config['best']['evaluation_function'],
+                                                             "-".join(config['rxn_type']),
+                                                            self.config['best']['trial_date'])
+                else:
+                    calc_dir = '{}_{}_{}_{}_only-calc_{}'.format(self.config['task_name'], 
                                                              self.config['model_type'], 
                                                         self.config['best']['evaluation_function'],
                                                              "-".join(config['rxn_type']),
