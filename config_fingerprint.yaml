@@ -17,12 +17,13 @@ rxn_type:                       # for only PC/PC_rgr, you can select PC_rxn_type
 # - CO_dp
 fingerprint_type: morgan        # name of fingerprint: morgan
 add_temp: False                 
-model_type: RFR               # model selection: RFC/LR/RFR/Lasso/XGB/SVR
+model_type: SVR               # model selection: RFC/LR/RFR/Lasso/XGB/SVR
 best_model: True              #use best parameters
 ORD_train: False               # use ORD data as train
 fingerprint: False              # use fingerprint
 calc: True                     # use calculation data
-std: True                      #use standerized calculation data
+std: False                      #use standerized calculation data
+train_test: False               # calulation train score
 CV: True                       # cross validation
 n_splits: 2                    # numbaer of split in K-forld
 #model: 
@@ -39,7 +40,7 @@ dataset:
   #splitting: random          # data splitting (i.e., random/scaffold)
 
 best:
-  evaluation_function: RMSE      #Evaluation function: classifier: acu/roc
+  evaluation_function: R2      #Evaluation function: classifier: acu/roc
                                                      #rgressor: R2/RMSE/MSE/RMSLE
-  trial_num: 726
-  trial_date: 2304241551
+  trial_num: 438
+  trial_date: 2304231107

@@ -5,6 +5,8 @@ import yaml
 import numpy as np
 import pandas as pd
 from datetime import datetime
+import pickle
+import sys
 
 import rdkit
 from rdkit import Chem
@@ -74,6 +76,14 @@ def main(config, seed):
                     if i > 0:
                         coment += '-'
                     coment += t
+            if config['data_pick_up']:
+                pickup_data_dir = 'data/PhotoCat/sampling'
+                os.makedirs(pickup_data_dir, exist_ok=True)
+                pickup_train = os.path.join(pickup_data_dir, 'train_data_idx_{}-{}'.format(seed,n))
+                pickup_test = os.path.join(pickup_data_dir, 'test_data_idx_{}-{}'.format(seed,n))
+                pickle.dump(train_val_idx, open(pickup_train, 'wb'))
+                pickle.dump(test_idx, open(pickup_test, 'wb'))
+                continue
             if config['best_model']:
                     sk_model = SK_best_model(config, data_set, label_set, coment=coment, n=n,
                                              start_time=start_time)
@@ -141,7 +151,9 @@ if __name__ == "__main__":
     results_list = []
     config['dataset']['target'] = target
     for seed in range(try_num):
-        if config['train_test']:
+        if config['data_pick_up']:
+            main(config, seed)
+        elif config['train_test']:
             train_results, results = main(config, seed)
             for i in range(config['n_splits']):
                 results_list.append([seed, i, train_results[i], results[i]])
@@ -149,7 +161,8 @@ if __name__ == "__main__":
             _, result = main(config, seed)
             for i in range(config['n_splits']):
                 results_list.append([seed, i, results[i]])
-
+    
+    if config['data_pick_up']: sys.exit()
     os.makedirs('experiments', exist_ok=True)
     repro_dir = os.path.join('experiments', 'reproductions')
     os.makedirs(repro_dir, exist_ok=True)

@@ -5,6 +5,7 @@ import yaml
 import numpy as np
 import pandas as pd
 from datetime import datetime
+import pickle
 
 import rdkit
 from rdkit import Chem
@@ -193,7 +194,7 @@ def main(config):
         kf = KFold(n_splits=config['n_splits'],shuffle=True,random_state=seed)
         result_score = 0
         start_time = datetime.now().strftime('%y%m%d%H%M')
-        for n,(train_val_idx,test_idx) in enumerate(kf.split(target_data_idx)): 
+        for n,(train_val_idx,test_idx) in enumerate(kf.split(target_data_idx)):
             train_val_data_list = copy.deepcopy(train_data_list)
             train_val_labels = copy.deepcopy(train_labels)
             train_val_data_list.extend(target_data_arry[train_val_idx].tolist())
