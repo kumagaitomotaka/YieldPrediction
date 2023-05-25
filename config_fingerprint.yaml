@@ -18,13 +18,14 @@ rxn_type:                       # for only PC/PC_rgr, you can select PC_rxn_type
 fingerprint_type: morgan        # name of fingerprint: morgan
 add_temp: False                 
 model_type: SVR               # model selection: RFC/LR/RFR/Lasso/XGB/SVR
-best_model: True              #use best parameters
+best_model: False              #use best parameters
 ORD_train: False               # use ORD data as train
 fingerprint: False              # use fingerprint
 calc: True                     # use calculation data
 std: False                      #use standerized calculation data
 train_test: False               # calulation train score
 CV: True                       # cross validation
+seed: 43                        # randam seed for K-fold
 n_splits: 2                    # numbaer of split in K-forld
 #model: 
   #num_layer: 5                  # number of graph conv layers

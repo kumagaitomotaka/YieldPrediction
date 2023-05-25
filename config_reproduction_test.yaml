@@ -18,7 +18,7 @@ rxn_type:                       # for only PC/PC_rgr, you can select PC_rxn_type
 fingerprint_type: morgan        # name of fingerprint: morgan
 add_temp: False                 
 model_type: XGB              # model selection: RFR/Lasso/XGB/SVR
-best_model: True              #use best parameters
+best_model: False              #use best parameters
 ORD_train: False               # use ORD data as train
 fingerprint: False              # use fingerprint
 calc: True                     # use calculation data

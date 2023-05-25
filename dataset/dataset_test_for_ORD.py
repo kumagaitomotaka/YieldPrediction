@@ -120,7 +120,7 @@ def read_smiles_for_ORD(data_path, target, task, rxn_type, target_rxn=None):
                         if task == 'classification':
                             target_labels.append(int(float(label)//10)) #収率を1/10にして0~10の範囲に
                         elif task == 'regression':
-                            target_labels.append(float(label))
+                            target_labels.append(float(label/100))
                         else:
                             raise ValueError('task must be either regression or classification') 
                     else:
@@ -128,7 +128,7 @@ def read_smiles_for_ORD(data_path, target, task, rxn_type, target_rxn=None):
                         if task == 'classification':
                             labels.append(int(float(label)//10)) #収率を1/10にして0~10の範囲に
                         elif task == 'regression':
-                            labels.append(float(label))
+                            labels.append(float(label/100))
                         else:
                             raise ValueError('task must be either regression or classification')
     if target_rxn != None:

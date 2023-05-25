@@ -69,7 +69,7 @@ def read_csv(config,data_path, rxn_type, target_rxn=None):
                     if task == 'classification':
                         target_labels.append(int(float(label)//10)) #収率を1/10にして0~10の範囲に
                     elif task == 'regression':
-                        target_labels.append(float(label)/10)
+                        target_labels.append(float(label)/100) #収率を1/100にして0~1の範囲に
                     else:
                         raise ValueError('task must be either regression or classification') 
                 else:
@@ -77,7 +77,7 @@ def read_csv(config,data_path, rxn_type, target_rxn=None):
                     if task == 'classification':
                         labels.append(int(float(label)//10)) #収率を1/10にして0~10の範囲に
                     elif task == 'regression':
-                        labels.append(float(label)/10)
+                        labels.append(float(label)/100) #収率を1/100にして0~1の範囲に
                     else:
                         raise ValueError('task must be either regression or classification')
     if target_rxn != None:
@@ -135,7 +135,6 @@ def _save_config_file(model_checkpoints_folder):
     
             
 def main(config):
-    seed = 0
     if config['task_name'] == 'PC' or config['task_name'] == 'PC_rgr': 
         target_rxn= 'CN'
     else:
@@ -178,6 +177,7 @@ def main(config):
         
         
     elif config['CV']:
+        seed = config['seed']
         if target_rxn != None:
             #read_scv -> smiles_list
             train_data_list, train_labels, target_data_list, target_labels = read_csv(config, data_path=config['dataset']['data_path'], rxn_type=config['rxn_type'], target_rxn=target_rxn)
@@ -212,11 +212,11 @@ def main(config):
                 coment = ''
             elif config['task_name'] == 'PC' or config['task_name'] == 'PC_rgr': 
                 if config['fingerprint']:
-                    coment = 'only-fp_'
+                    coment = 'seed{}_only-fp_'.format(seed)
                     if config['calc']:
-                        coment = 'fp+Calc_'
+                        coment = 'seed{}_fp+Calc_'.format(seed)
                 elif config['calc']:
-                    coment = 'only-calc_'
+                    coment = 'seed{}_only-calc_'.format(seed)
                 else:    
                     coment = ''
                 for i,t in enumerate(config['rxn_type']):

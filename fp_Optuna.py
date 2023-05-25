@@ -233,7 +233,10 @@ if __name__ == "__main__":
     TRIAL_SIZE = config['trial_size']
     objective = Objective(config, current_time)
     os.makedirs('study', exist_ok=True)
-    study_name = os.path.join('study', '{}_{}_{}_study_{}'.format(config['task_name'], config['model_type'], "-".join(config['rxn_type']), current_time))
+    if config['std']:
+        study_name = os.path.join('study', '{}_{}_{}_std-dEST_study_{}'.format(config['task_name'], config['model_type'], "-".join(config['rxn_type']), current_time))
+    else:
+        study_name = os.path.join('study', '{}_{}_{}_study_{}'.format(config['task_name'], config['model_type'], "-".join(config['rxn_type']), current_time))
     if config['evaluation_function'] in ['acu', 'roc', 'R2']:
         study = optuna.create_study(study_name=study_name, 
                                     storage='sqlite:///'+study_name+".db",load_if_exists=True,
